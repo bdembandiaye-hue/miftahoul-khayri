@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact - Miftahoul Khayri</title>
+<link rel="icon" href="khayri.jpeg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav><div class="logo"><img src="khayri.jpeg" alt="Logo"><h2>Miftahoul Khayri</h2></div><div class="menu"><a href="index.html">Accueil</a><a href="historique.html">Historique</a><a href="xam-sa-dine.html">Xam sa diné</a><a href="actualites.html">Actualités</a><a href="evenements.html">Événements</a><a href="contact.html">Contact</a></div></nav>
+
+<main class="page">
+  <div class="page-header">
+    <h1>Nous <span>contacter</span></h1>
+    <p>Une question, une suggestion ou l'envie de rejoindre le Daara ? Remplissez le formulaire, nous vous recontacterons rapidement.</p>
+  </div>
+
+  <div class="contact-layout">
+    <!-- Coordonnées -->
+    <aside class="contact-box">
+      <h3>Daara Miftahoul Khayri</h3>
+      <div class="arabe">دار مفتاح الخير</div>
+      <div class="contact-item"><span>📍</span><div><strong>Adresse</strong><small>Daral Miftahoul Khayri — Diakhao</small></div></div>
+      <div class="contact-item"><span>📞</span><div><strong>Téléphone / WhatsApp</strong><small>À compléter</small></div></div>
+      <div class="contact-item"><span>✉️</span><div><strong>Email</strong><small>À compléter</small></div></div>
+      <div class="contact-item"><span>🕌</span><div><strong>Rencontres</strong><small>Jours et horaires à compléter</small></div></div>
+      <p class="note">Vos informations restent confidentielles et ne sont utilisées que par l'administration du Daara.</p>
+    </aside>
+
+    <!-- Formulaire -->
+    <section class="form-card" id="formCard">
+      <h2>Formulaire de contact</h2>
+      <p class="form-intro">Les champs marqués <span class="req">*</span> sont obligatoires.</p>
+
+      <form id="contactForm" novalidate>
+        <!-- anti-spam (invisible) -->
+        <div class="hp" aria-hidden="true"><label>Site web <input name="website" tabindex="-1" autocomplete="off"></label></div>
+
+        <fieldset>
+          <legend>Vos informations</legend>
+          <div class="row">
+            <div class="field"><label for="prenom">Prénom <span class="req">*</span></label><input id="prenom" name="prenom" autocomplete="given-name" maxlength="60" required><div class="err">Veuillez saisir votre prénom.</div></div>
+            <div class="field"><label for="nom">Nom <span class="req">*</span></label><input id="nom" name="nom" autocomplete="family-name" maxlength="60" required><div class="err">Veuillez saisir votre nom.</div></div>
+          </div>
+          <div class="row">
+            <div class="field"><label for="telephone">Téléphone <span class="req">*</span></label><div class="tel-wrap"><span>+221</span><input id="telephone" name="telephone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="77 123 45 67" maxlength="14" required></div><div class="err">Numéro invalide (9 chiffres, ex : 77 123 45 67).</div></div>
+            <div class="field"><label for="email">Email <span class="opt">(facultatif)</span></label><input id="email" name="email" type="email" autocomplete="email" maxlength="100"><div class="err">Adresse email invalide.</div></div>
+          </div>
+          <div class="row">
+            <div class="field"><label for="ville">Ville / Quartier <span class="opt">(facultatif)</span></label><input id="ville" name="ville" maxlength="80" placeholder="Ex : Diakhao, Kaolack, Dakar…"></div>
+            <div class="field"><label for="age">Tranche d'âge <span class="opt">(facultatif)</span></label>
+              <select id="age" name="age"><option value="">— Choisir —</option><option>Moins de 18 ans</option><option>18 – 25 ans</option><option>26 – 35 ans</option><option>36 – 50 ans</option><option>Plus de 50 ans</option></select></div>
+          </div>
+          <div class="field"><span class="question">Comment préférez-vous être recontacté(e) ?</span>
+            <div class="choices">
+              <div class="choice"><input type="radio" id="c1" name="moyen" value="Appel" checked><label for="c1">📞 Appel</label></div>
+              <div class="choice"><input type="radio" id="c2" name="moyen" value="WhatsApp"><label for="c2">💬 WhatsApp</label></div>
+              <div class="choice"><input type="radio" id="c3" name="moyen" value="SMS"><label for="c3">✉️ SMS</label></div>
+              <div class="choice"><input type="radio" id="c4" name="moyen" value="Email"><label for="c4">📧 Email</label></div>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Rejoindre le Daara</legend>
+          <div class="field" id="fieldIntegrer"><span class="question">Souhaitez-vous intégrer le Daara ? <span class="req">*</span></span>
+            <div class="choices">
+              <div class="choice"><input type="radio" id="iOui" name="integrer" value="Oui"><label for="iOui">Oui, je souhaite rejoindre</label></div>
+              <div class="choice"><input type="radio" id="iNon" name="integrer" value="Non"><label for="iNon">Non, pas pour le moment</label></div>
+              <div class="choice"><input type="radio" id="iDeja" name="integrer" value="Déjà membre"><label for="iDeja">Je suis déjà membre</label></div>
+            </div>
+            <div class="err">Merci de répondre à cette question.</div>
+          </div>
+
+          <div class="reveal" id="blocOui">
+            <div class="field" id="fieldPourquoi"><label for="pourquoi">Pourquoi souhaitez-vous intégrer le Daara ? <span class="req">*</span></label>
+              <textarea id="pourquoi" name="pourquoi" maxlength="1000" placeholder="Parlez-nous de votre motivation…"></textarea>
+              <div class="counter"><span data-count="pourquoi">0</span>/1000</div>
+              <div class="err">Expliquez en quelques mots votre motivation (10 caractères minimum).</div></div>
+
+            <div class="field"><span class="question">Comment aimeriez-vous contribuer ? <span class="opt">(plusieurs choix possibles)</span></span>
+              <div class="choices">
+                <div class="choice"><input type="checkbox" id="k1" name="contributions" value="Apprentissage du Coran"><label for="k1">📖 Apprendre le Coran</label></div>
+                <div class="choice"><input type="checkbox" id="k2" name="contributions" value="Xassaïdes / Kurel"><label for="k2">🎙️ Xassaïdes / Kurel</label></div>
+                <div class="choice"><input type="checkbox" id="k3" name="contributions" value="Enseignement"><label for="k3">👨‍🏫 Enseignement</label></div>
+                <div class="choice"><input type="checkbox" id="k4" name="contributions" value="Organisation des événements"><label for="k4">🗓️ Organisation</label></div>
+                <div class="choice"><input type="checkbox" id="k5" name="contributions" value="Cotisations / Dons"><label for="k5">🤝 Cotisations / Dons</label></div>
+                <div class="choice"><input type="checkbox" id="k6" name="contributions" value="Communication / Réseaux sociaux"><label for="k6">📱 Communication</label></div>
+                <div class="choice"><input type="checkbox" id="k7" name="contributions" value="Cuisine / Logistique"><label for="k7">🍲 Cuisine / Logistique</label></div>
+              </div>
+            </div>
+
+            <div class="field"><label for="disponibilite">Vos disponibilités <span class="opt">(facultatif)</span></label>
+              <select id="disponibilite" name="disponibilite"><option value="">— Choisir —</option><option>Week-end uniquement</option><option>En semaine (soir)</option><option>Toute la semaine</option><option>Seulement lors des grands événements</option></select></div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Votre message</legend>
+          <div class="field"><label for="objet">Objet <span class="opt">(facultatif)</span></label>
+            <select id="objet" name="objet"><option value="">— Choisir —</option><option>Demande d'information</option><option>Inscription d'un enfant</option><option>Participation à un événement</option><option>Don / Soutien</option><option>Autre</option></select></div>
+          <div class="field"><label for="suggestions">Vos suggestions <span class="opt">(facultatif)</span></label>
+            <textarea id="suggestions" name="suggestions" maxlength="1500" placeholder="Une idée pour améliorer le Daara, une activité à proposer…"></textarea>
+            <div class="counter"><span data-count="suggestions">0</span>/1500</div></div>
+          <div class="field"><label for="message">Autre message <span class="opt">(facultatif)</span></label>
+            <textarea id="message" name="message" maxlength="1500" placeholder="Votre question ou message…"></textarea></div>
+          <div class="field"><label for="source">Comment avez-vous connu le Daara ? <span class="opt">(facultatif)</span></label>
+            <select id="source" name="source"><option value="">— Choisir —</option><option>Famille / Ami</option><option>Réseaux sociaux</option><option>Lors d'un événement</option><option>Site internet</option><option>Autre</option></select></div>
+        </fieldset>
+
+        <div class="field" id="fieldConsent"><label class="consent"><input type="checkbox" id="consent" name="consent" value="oui"> J'accepte que le Daara Miftahoul Khayri conserve ces informations pour me recontacter. <span class="req">*</span></label><div class="err">Veuillez cocher cette case.</div></div>
+
+        <button class="bouton principal" type="submit" id="sendBtn">Envoyer ma demande</button>
+        <div class="form-msg" id="formMsg" role="status"></div>
+      </form>
+    </section>
+  </div>
+</main>
+
+<footer>© 2026 <span>Dahira Miftahoul Khayri</span> — Tous droits réservés.</footer>
+<script src="script.js"></script>
+<script>
+const form=document.getElementById('contactForm'),blocOui=document.getElementById('blocOui'),msg=document.getElementById('formMsg'),btn=document.getElementById('sendBtn');
+
+// Afficher "Pourquoi" seulement si Oui
+form.querySelectorAll('input[name="integrer"]').forEach(r=>r.addEventListener('change',()=>{
+  blocOui.classList.toggle('open',form.integrer.value==='Oui');
+  document.getElementById('fieldIntegrer').classList.remove('invalid');
+}));
+
+// Compteurs de caractères
+document.querySelectorAll('[data-count]').forEach(s=>{const t=document.getElementById(s.dataset.count);t.addEventListener('input',()=>s.textContent=t.value.length)});
+
+// Téléphone : chiffres + espaces auto (77 123 45 67)
+const tel=document.getElementById('telephone');
+tel.addEventListener('input',()=>{let d=tel.value.replace(/\D/g,'');if(d.startsWith('221')&&d.length>9)d=d.slice(3);d=d.slice(0,9);tel.value=d.replace(/^(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/,(m,a,b,c,e)=>[a,b,c,e].filter(Boolean).join(' '))});
+
+function setErr(id,bad){const f=document.getElementById(id).closest('.field');f.classList.toggle('invalid',bad);return !bad}
+form.querySelectorAll('input,textarea').forEach(el=>el.addEventListener('input',()=>el.closest('.field')&&el.closest('.field').classList.remove('invalid')||(msg.className='form-msg')));
+
+function validate(){
+  let ok=true;
+  ok=setErr('prenom',form.prenom.value.trim().length<2)&&ok;
+  ok=setErr('nom',form.nom.value.trim().length<2)&&ok;
+  ok=setErr('telephone',!/^[37]\d{8}$/.test(tel.value.replace(/\D/g,'')))&&ok;
+  ok=setErr('email',form.email.value.trim()!==''&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.value.trim()))&&ok;
+  const integ=form.integrer.value;
+  const fi=document.getElementById('fieldIntegrer');fi.classList.toggle('invalid',!integ);if(!integ)ok=false;
+  if(integ==='Oui')ok=setErr('pourquoi',form.pourquoi.value.trim().length<10)&&ok;else setErr('pourquoi',false);
+  ok=setErr('consent',!form.consent.checked)&&ok;
+  return ok;
+}
+
+form.addEventListener('submit',async e=>{
+  e.preventDefault();msg.className='form-msg';
+  if(!validate()){msg.textContent='Merci de corriger les champs en rouge.';msg.className='form-msg ko';const first=form.querySelector('.invalid');if(first)first.scrollIntoView({behavior:'smooth',block:'center'});return}
+  const data=Object.fromEntries(new FormData(form));
+  data.contributions=[...form.querySelectorAll('input[name="contributions"]:checked')].map(c=>c.value);
+  data.telephone='+221 '+tel.value;
+  btn.disabled=true;btn.textContent='Envoi en cours…';
+  try{
+    const r=await fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error||'Erreur lors de l’envoi.');
+    document.getElementById('formCard').innerHTML=`<div class="success-box"><div class="big">🤲🏾</div><h2>Merci ${escapeHTML(data.prenom)} !</h2><p class="form-intro">Votre demande a bien été envoyée. ${data.integrer==='Oui'?'Un responsable du Daara vous recontactera très bientôt pour votre intégration.':'Nous vous répondrons dans les meilleurs délais.'}</p><a class="bouton secondaire" href="index.html">Retour à l'accueil</a></div>`;
+  }catch(err){msg.textContent=err.message;msg.className='form-msg ko';btn.disabled=false;btn.textContent='Envoyer ma demande'}
+});
+</script>
+</body>
+</html>
