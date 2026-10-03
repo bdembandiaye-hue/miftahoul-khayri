@@ -17,7 +17,7 @@ const RESEAUX={
   whatsapp:'https://wa.me/221778892734',
   telephone:'+221 77 889 27 34',
   telegram:'https://t.me/MiftahoulKhayriBot',
-  tiktok:'',     // ex : https://www.tiktok.com/@miftahoulkhayri
+  tiktok:'https://www.tiktok.com/@miftakhoulkhayri0',
   youtube:''     // ex : https://www.youtube.com/@miftahoulkhayri
 };
 const ICONES={
