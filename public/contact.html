@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Contact - Miftahoul Khayri</title>
 <link rel="icon" href="khayri.jpeg">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -21,10 +22,11 @@
     <aside class="contact-box">
       <h3>Daara Miftahoul Khayri</h3>
       <div class="arabe">دار مفتاح الخير</div>
-      <div class="contact-item"><span>📍</span><div><strong>Adresse</strong><small>Daral Miftahoul Khayri — Diakhao</small></div></div>
-      <div class="contact-item"><span>📞</span><div><strong>Téléphone / WhatsApp</strong><small>À compléter</small></div></div>
+      <div class="contact-item"><span>📍</span><div><strong>Adresse</strong><small>Daral Miftahoul Khayri — Diakhao<br><a href="#carte" style="color:var(--or)">Voir sur la carte ↓</a></small></div></div>
+      <div class="contact-item"><span>📞</span><div><strong>Téléphone / WhatsApp</strong><small><a href="tel:+221778892734" style="color:#fff;text-decoration:none">+221 77 889 27 34</a> · <a href="https://wa.me/221778892734" target="_blank" rel="noopener" style="color:var(--or)">WhatsApp</a></small></div></div>
       <div class="contact-item"><span>✉️</span><div><strong>Email</strong><small>À compléter</small></div></div>
       <div class="contact-item"><span>🕌</span><div><strong>Rencontres</strong><small>Jours et horaires à compléter</small></div></div>
+      <div class="socials" data-reseaux></div>
       <p class="note">Vos informations restent confidentielles et ne sont utilisées que par l'administration du Daara.</p>
     </aside>
 
@@ -116,9 +118,33 @@
       </form>
     </section>
   </div>
+
+  <!-- Carte -->
+  <section class="map-card" id="carte">
+    <div class="map-head">
+      <div><h2>Où nous trouver</h2><p>Daara Miftahoul Khayri — Diakhao, région de Fatick</p></div>
+      <a class="bouton principal" id="itineraire" target="_blank" rel="noopener">🧭 Itinéraire</a>
+    </div>
+    <div id="map" role="img" aria-label="Carte de localisation du Daara Miftahoul Khayri à Diakhao"></div>
+  </section>
 </main>
 
 <footer>© 2026 <span>Dahira Miftahoul Khayri</span> — Tous droits réservés.</footer>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ⚠️ Position du Daara : remplace par les coordonnées exactes (clic droit sur Google Maps > copier les coordonnées)
+const DAARA={lat:14.46209,lng:-16.29039,nom:'Daara Miftahoul Khayri',lieu:'Diakhao, Fatick — Sénégal'};
+(function(){
+  const it=document.getElementById('itineraire');
+  it.href=`https://www.google.com/maps/dir/?api=1&destination=${DAARA.lat},${DAARA.lng}`;
+  if(!window.L){document.getElementById('map').innerHTML='<p class="empty">Carte indisponible.</p>';return}
+  const map=L.map('map',{scrollWheelZoom:false}).setView([DAARA.lat,DAARA.lng],15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
+  const icon=L.divIcon({className:'daara-pin',html:'<img src="khayri.jpeg" alt="">',iconSize:[52,52],iconAnchor:[26,52],popupAnchor:[0,-50]});
+  L.marker([DAARA.lat,DAARA.lng],{icon}).addTo(map)
+    .bindPopup(`<strong>${DAARA.nom}</strong><br>${DAARA.lieu}<br><a href="${it.href}" target="_blank" rel="noopener">Itinéraire →</a>`).openPopup();
+})();
+</script>
 <script src="script.js"></script>
 <script>
 const form=document.getElementById('contactForm'),blocOui=document.getElementById('blocOui'),msg=document.getElementById('formMsg'),btn=document.getElementById('sendBtn');

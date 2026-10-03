@@ -1,10 +1,13 @@
 require('dotenv').config();
+// nettoie les espaces/retours à la ligne collés par erreur dans les variables
+for (const k of ['ADMIN_USER','ADMIN_PASSWORD','ADMIN_PASSWORD_HASH','SUPABASE_URL','SUPABASE_SERVICE_KEY','SESSION_SECRET','TELEGRAM_BOT_TOKEN','TELEGRAM_ADMIN_CHAT_ID','GROQ_API_KEY']) if (process.env[k]) process.env[k] = process.env[k].trim();
 const express = require('express');
 const session = require('express-session');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const store = require('./storage');
+const bot = require('./telegram');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -58,7 +61,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true, storage: store.useSupa
 app.get('/api/content', wrap(async (req, res) => res.json(await store.getContent())));
 
 app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
+  const username = String(req.body.username || '').trim(), password = String(req.body.password || '');
   if (username !== ADMIN_USER || !bcrypt.compareSync(password || '', ADMIN_PASSWORD_HASH)) {
     return res.status(401).json({ error: 'Identifiants incorrects.' });
   }
@@ -130,7 +133,7 @@ app.post('/api/contact', rateLimit, wrap(async (req, res) => {
   if (integrer === 'Oui' && pourquoi.length < 10) return res.status(400).json({ error: 'Expliquez pourquoi vous souhaitez intégrer le Daara.' });
   if (b.consent !== 'oui') return res.status(400).json({ error: 'Le consentement est obligatoire.' });
 
-  await store.addMessage({
+  const msg = {
     id: crypto.randomUUID(),
     prenom, nom,
     telephone: '+221 ' + digits.replace(/^(\d{2})(\d{3})(\d{2})(\d{2})$/, '$1 $2 $3 $4'),
@@ -148,7 +151,9 @@ app.post('/api/contact', rateLimit, wrap(async (req, res) => {
     source: clean(b.source, 40),
     lu: false,
     createdAt: new Date().toISOString()
-  });
+  };
+  await store.addMessage(msg);
+  bot.notifyNewMessage(msg);
   res.json({ ok: true });
 }));
 
@@ -173,12 +178,16 @@ app.get('/api/messages.csv', requireAdmin, wrap(async (req, res) => {
   res.send(csv);
 }));
 
+/* ================= BOT TELEGRAM ================= */
+bot.mount(app, store);
+
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: err.message || 'Erreur serveur.' });
 });
 
 app.listen(PORT, () => {
+  bot.setup(store);
   console.log('==========================================');
   console.log('Dahira Miftahoul Khayri');
   console.log(`Site : http://localhost:${PORT}`);

@@ -20,3 +20,9 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ADMIN_CHAT_ID
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

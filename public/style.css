@@ -158,3 +158,26 @@ footer span{color:var(--blanc);font-weight:600}
   .logo h2{font-size:21px}
   .logo img{width:46px;height:46px}
 }
+
+/* ===== Carte ===== */
+.map-card{max-width:1150px;margin:40px auto 0;background:var(--blanc);border-radius:var(--rayon);box-shadow:var(--ombre);border:1px solid var(--bord);overflow:hidden}
+.map-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:24px 28px}
+.map-head h2{font-size:30px;color:var(--bleu-fonce)}
+.map-head p{color:var(--gris);font-size:15px}
+#map{height:420px;width:100%;z-index:1}
+.daara-pin img{width:52px;height:52px;border-radius:50%;border:3px solid var(--blanc);box-shadow:0 0 0 3px var(--bleu),0 6px 14px rgba(10,31,56,.35);object-fit:cover}
+.daara-pin{background:none;border:none}
+@media(max-width:700px){#map{height:320px}.map-head{padding:18px}}
+
+/* ===== Réseaux sociaux ===== */
+.socials{display:flex;justify-content:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.soc{width:42px;height:42px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);transition:.25s}
+.soc svg{width:20px;height:20px;fill:#fff}
+.soc:hover{transform:translateY(-3px)}
+.soc.whatsapp:hover{background:#25D366}.soc.telegram:hover{background:#229ED9}.soc.tiktok:hover{background:#000}.soc.youtube:hover{background:#FF0000}
+.foot-tel{margin-bottom:10px}.foot-tel a{color:#fff;text-decoration:none;font-weight:600}
+.contact-box .socials{justify-content:flex-start;margin:18px 0 0}
+.wa-float{position:fixed;right:20px;bottom:20px;z-index:60;width:58px;height:58px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:.25s}
+.wa-float svg{width:30px;height:30px;fill:#fff}
+.wa-float:hover{transform:scale(1.08)}
+@media(max-width:700px){.wa-float{right:14px;bottom:14px;width:52px;height:52px}}
