@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Contact - Miftahoul Khayri</title>
-<link rel="icon" href="khayri.jpeg">
+<meta name="description" content="Contactez le Daara Miftahoul Khayri au quartier Diakhao à Thiès : téléphone, WhatsApp, carte et formulaire pour rejoindre le Daara."><link rel="canonical" href="https://dahira-miftahoul-khayri.onrender.com/contact.html"><meta property="og:type" content="website"><meta property="og:site_name" content="Daara Miftahoul Khayri"><meta property="og:title" content="Contact — Daara Miftahoul Khayri"><meta property="og:description" content="Contactez le Daara Miftahoul Khayri au quartier Diakhao à Thiès : téléphone, WhatsApp, carte et formulaire pour rejoindre le Daara."><meta property="og:url" content="https://dahira-miftahoul-khayri.onrender.com/contact.html"><meta property="og:image" content="https://dahira-miftahoul-khayri.onrender.com/khayri.jpeg"><meta property="og:locale" content="fr_SN"><meta name="twitter:card" content="summary"><meta name="theme-color" content="#1F6FC5"><link rel="icon" href="khayri.jpeg">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -22,7 +22,7 @@
     <aside class="contact-box">
       <h3>Daara Miftahoul Khayri</h3>
       <div class="arabe">دار مفتاح الخير</div>
-      <div class="contact-item"><span>📍</span><div><strong>Adresse</strong><small>Daral Miftahoul Khayri — Diakhao<br><a href="#carte" style="color:var(--or)">Voir sur la carte ↓</a></small></div></div>
+      <div class="contact-item"><span>📍</span><div><strong>Adresse</strong><small>Daral Miftahoul Khayri — Quartier Diakhao, Thiès<br><a href="#carte" style="color:var(--or)">Voir sur la carte ↓</a></small></div></div>
       <div class="contact-item"><span>📞</span><div><strong>Téléphone / WhatsApp</strong><small><a href="tel:+221778892734" style="color:#fff;text-decoration:none">+221 77 889 27 34</a> · <a href="https://wa.me/221778892734" target="_blank" rel="noopener" style="color:var(--or)">WhatsApp</a></small></div></div>
       <div class="contact-item"><span>✉️</span><div><strong>Email</strong><small>À compléter</small></div></div>
       <div class="contact-item"><span>🕌</span><div><strong>Rencontres</strong><small>Jours et horaires à compléter</small></div></div>
@@ -50,7 +50,7 @@
             <div class="field"><label for="email">Email <span class="opt">(facultatif)</span></label><input id="email" name="email" type="email" autocomplete="email" maxlength="100"><div class="err">Adresse email invalide.</div></div>
           </div>
           <div class="row">
-            <div class="field"><label for="ville">Ville / Quartier <span class="opt">(facultatif)</span></label><input id="ville" name="ville" maxlength="80" placeholder="Ex : Diakhao, Kaolack, Dakar…"></div>
+            <div class="field"><label for="ville">Ville / Quartier <span class="opt">(facultatif)</span></label><input id="ville" name="ville" maxlength="80" placeholder="Ex : Diakhao, Thiès, Dakar…"></div>
             <div class="field"><label for="age">Tranche d'âge <span class="opt">(facultatif)</span></label>
               <select id="age" name="age"><option value="">— Choisir —</option><option>Moins de 18 ans</option><option>18 – 25 ans</option><option>26 – 35 ans</option><option>36 – 50 ans</option><option>Plus de 50 ans</option></select></div>
           </div>
@@ -122,10 +122,10 @@
   <!-- Carte -->
   <section class="map-card" id="carte">
     <div class="map-head">
-      <div><h2>Où nous trouver</h2><p>Daara Miftahoul Khayri — Diakhao, région de Fatick</p></div>
+      <div><h2>Où nous trouver</h2><p>Daara Miftahoul Khayri — Quartier Diakhao, Thiès</p></div>
       <a class="bouton principal" id="itineraire" target="_blank" rel="noopener">🧭 Itinéraire</a>
     </div>
-    <div id="map" role="img" aria-label="Carte de localisation du Daara Miftahoul Khayri à Diakhao"></div>
+    <div id="map" role="img" aria-label="Carte de localisation du Daara Miftahoul Khayri, quartier Diakhao à Thiès"></div>
   </section>
 </main>
 
@@ -133,7 +133,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // ⚠️ Position du Daara : remplace par les coordonnées exactes (clic droit sur Google Maps > copier les coordonnées)
-const DAARA={lat:14.46209,lng:-16.29039,nom:'Daara Miftahoul Khayri',lieu:'Diakhao, Fatick — Sénégal'};
+const DAARA={lat:14.798387,lng:-16.938859,nom:'Daara Miftahoul Khayri',lieu:'Quartier Diakhao, Thiès — Sénégal'};
 (function(){
   const it=document.getElementById('itineraire');
   it.href=`https://www.google.com/maps/dir/?api=1&destination=${DAARA.lat},${DAARA.lng}`;
@@ -145,7 +145,7 @@ const DAARA={lat:14.46209,lng:-16.29039,nom:'Daara Miftahoul Khayri',lieu:'Diakh
     .bindPopup(`<strong>${DAARA.nom}</strong><br>${DAARA.lieu}<br><a href="${it.href}" target="_blank" rel="noopener">Itinéraire →</a>`).openPopup();
 })();
 </script>
-<script src="script.js"></script>
+<script src="script.js"></script><script src="i18n.js"></script>
 <script>
 const form=document.getElementById('contactForm'),blocOui=document.getElementById('blocOui'),msg=document.getElementById('formMsg'),btn=document.getElementById('sendBtn');
 

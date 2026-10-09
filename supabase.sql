@@ -6,7 +6,7 @@
 -- Contenus du site (PDF, photos, audios, événements)
 create table if not exists public.items (
   id          text primary key,
-  type        text not null check (type in ('pdf','photo','audio','event')),
+  type        text not null check (type in ('pdf','photo','audio','event','video','page')),
   data        jsonb not null default '{}'::jsonb,
   created_at  timestamptz not null default now()
 );

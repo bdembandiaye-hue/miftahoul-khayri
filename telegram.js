@@ -7,6 +7,8 @@ const crypto = require('crypto');
 
 const TOKEN = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
 const ADMIN_CHAT = (process.env.TELEGRAM_ADMIN_CHAT_ID || '').trim();
+const CHANNEL = (process.env.TELEGRAM_CHANNEL_ID || '').trim(); // ex : @miftahoulkhayri ou -100…
+const REMIND_HOUR = parseInt(process.env.REMINDER_HOUR || '18', 10); // heure du rappel (GMT = heure du Sénégal)
 const GROQ_KEY = (process.env.GROQ_API_KEY || '').trim();
 const GROQ_MODEL = (process.env.GROQ_MODEL || 'llama-3.3-70b-versatile').trim();
 const SITE = (process.env.SITE_URL || process.env.RENDER_EXTERNAL_URL || 'https://dahira-miftahoul-khayri.onrender.com').replace(/\/$/, '');
@@ -16,7 +18,7 @@ const enabled = !!TOKEN;
 const INFO = {
   nom: 'Daara Miftahoul Khayri',
   arabe: 'دار مفتاح الخير',
-  lieu: 'Daral Miftahoul Khayri — Diakhao (région de Fatick), Sénégal',
+  lieu: 'Daral Miftahoul Khayri — Quartier Diakhao, Thiès (près de l\'hôpital Saint Jean de Dieu), Sénégal',
   tel: '+221 77 889 27 34',
   wa: 'https://wa.me/221778892734',
   histoire: 'Le Dahira Miftahoul Khayri a été créé en 2007 par Serigne Saliou Mbacké, fils de Serigne Touba.',
@@ -70,7 +72,7 @@ async function pdfText(store) {
 const T = {
   start: n => `Assalamou aleykoum ${esc(n || '')} 🤲🏾\n\nBienvenue sur le bot du <b>${INFO.nom}</b> (${INFO.arabe}).\n<i>${INFO.devise}</i>\n\nChoisissez une option ci-dessous ou posez-moi votre question.`,
   rejoindre: () => `🤝 <b>Rejoindre le Daara</b>\n\nRemplissez le formulaire, un responsable vous recontactera :\n👉 ${SITE}/contact.html\n\nOu écrivez-nous sur WhatsApp : ${INFO.wa}`,
-  adresse: () => `📍 <b>Adresse</b>\n${INFO.lieu}\n\nItinéraire : https://www.google.com/maps/dir/?api=1&destination=14.46209,-16.29039\nCarte : ${SITE}/contact.html#carte`,
+  adresse: () => `📍 <b>Adresse</b>\n${INFO.lieu}\n\nItinéraire : https://www.google.com/maps/dir/?api=1&destination=14.798387,-16.938859\nCarte : ${SITE}/contact.html#carte`,
   contact: () => `📞 <b>Contact</b>\nTéléphone / WhatsApp : ${INFO.tel}\nWhatsApp : ${INFO.wa}\nSite : ${SITE}`,
   histoire: () => `🕌 <b>Historique</b>\n${INFO.histoire}\n\nEn savoir plus : ${SITE}/historique.html`,
   inconnu: () => `Je n'ai pas bien compris 🙏🏾\nUtilisez le menu ci-dessous, ou contactez-nous au ${INFO.tel} (WhatsApp : ${INFO.wa}).`
@@ -85,6 +87,8 @@ const RULES = [
   [/(^\/adresse|adresse|o[uù] se trouve|localisation|itin[eé]raire|carte|diakhao|situ[eé])/i, () => T.adresse()],
   [/(^\/contact|contact|t[eé]l[eé]phone|num[eé]ro|appeler|whatsapp|joindre)/i, () => T.contact()],
   [/(^\/historique|histoire|historique|cr[eé][eé]|fondateur|fond[eé]|serigne saliou)/i, () => T.histoire()],
+  [/(^\/canal|canal|cha[iî]ne|annonce)/i, () => CHANNEL ? `📢 Rejoignez notre canal d'annonces : ${CHANNEL.startsWith('@') ? 'https://t.me/' + CHANNEL.slice(1) : CHANNEL}` : `📢 Canal d'annonces bientôt disponible.`],
+  [/(^\/youtube|youtube|vid[eé]o|kurel tv)/i, () => `🎬 Notre chaîne YouTube : https://www.youtube.com/@kurelmiftaahulxayritv\nVidéos aussi sur ${SITE}/actualites.html`],
   [/(^\/site|site web|site internet|lien)/i, () => `🌐 ${SITE}`]
 ];
 
@@ -143,6 +147,60 @@ function notifyNewMessage(msg) {
   );
 }
 
+
+/* ---------- Canal d'annonces : publication automatique ---------- */
+const fullUrl = u => !u ? '' : (u.startsWith('http') ? u : SITE + u);
+const frDate = d => { if (!d) return 'Date à venir'; const [y, m, j] = d.split('-'); return new Date(Date.UTC(+y, m - 1, +j)).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }); };
+
+function eventText(e, prefix) {
+  return `${prefix}\n\n<b>${esc(e.title)}</b>\n📅 ${esc(frDate(e.date))}${e.time ? ' à ' + esc(e.time) : ''}` +
+    (e.place ? `\n📍 ${esc(e.place)}` : '') + (e.description ? `\n\n${esc(e.description)}` : '') +
+    `\n\n👉 ${SITE}/evenements.html`;
+}
+
+async function post(chat, text, photo) {
+  if (photo && photo.startsWith('http')) {
+    const r = await tg('sendPhoto', { chat_id: chat, photo, caption: text.slice(0, 1000), parse_mode: 'HTML' });
+    if (r && r.ok) return r;
+  }
+  return send(chat, text);
+}
+
+function announce(type, item) {
+  if (!enabled || !CHANNEL) return;
+  let text = null, photo = null;
+  if (type === 'event') { text = eventText(item, '🕌 <b>Nouvel événement du Daara</b>'); photo = fullUrl(item.url); }
+  else if (type === 'pdf') text = `📖 <b>Nouveau document : ${esc(item.title)}</b>${item.url ? `\n⬇️ ${fullUrl(item.url)}` : ''}\n\n${SITE}/xam-sa-dine.html`;
+  else if (type === 'photo') { text = `📸 <b>${esc(item.title)}</b>${item.description ? '\n' + esc(item.description) : ''}\n\n${SITE}/actualites.html`; photo = fullUrl(item.url); }
+  else if (type === 'audio') text = `🎧 <b>Nouvel audio : ${esc(item.title)}</b>\n${SITE}/actualites.html`;
+  else if (type === 'video') text = `🎬 <b>${esc(item.title)}</b>\nhttps://youtu.be/${item.youtube}\n\n${SITE}/actualites.html`;
+  if (text) post(CHANNEL, text, photo).catch(e => console.error('Annonce', e.message));
+}
+
+/* ---------- Rappel automatique la veille de chaque événement ---------- */
+function startReminders(store) {
+  if (!enabled || (!CHANNEL && !ADMIN_CHAT)) return;
+  const tick = async () => {
+    try {
+      const now = new Date();
+      if (now.getUTCHours() < REMIND_HOUR) return; // à partir de 18h la veille
+      const demain = new Date(now.getTime() + 86400000).toISOString().slice(0, 10);
+      const db = await store.getContent();
+      for (const e of db.events) {
+        if (e.date !== demain || e.remindedFor === e.date) continue;
+        await store.updateItem('event', e.id, { remindedFor: e.date }); // marqué avant l'envoi : jamais 2 rappels
+        const txt = eventText(e, '⏰ <b>RAPPEL — c\'est demain, inch\'Allah !</b>');
+        if (CHANNEL) await post(CHANNEL, txt, fullUrl(e.url));
+        if (ADMIN_CHAT && ADMIN_CHAT !== CHANNEL) await send(ADMIN_CHAT, txt);
+        console.log('Rappel envoyé :', e.title);
+      }
+    } catch (err) { console.error('Rappels', err.message); }
+  };
+  setTimeout(tick, 20000);
+  setInterval(tick, 15 * 60 * 1000); // toutes les 15 min
+  console.log(`Rappels d'événements : actifs (la veille à partir de ${REMIND_HOUR}h)`);
+}
+
 /* ---------- Branchement Express ---------- */
 function mount(app, store) {
   app.post('/api/telegram/webhook', (req, res) => {
@@ -169,6 +227,7 @@ async function startPolling(store) {
 
 async function setup() {
   if (!enabled) { console.log('Bot Telegram : désactivé (TELEGRAM_BOT_TOKEN absent)'); return; }
+  startReminders(arguments[0]);
   if (!process.env.RENDER_EXTERNAL_URL && !process.env.SITE_URL) return startPolling(arguments[0]);
   await tg('setWebhook', { url: `${SITE}/api/telegram/webhook`, secret_token: SECRET, allowed_updates: ['message', 'edited_message'], drop_pending_updates: false });
   await tg('setMyCommands', { commands: [
@@ -183,4 +242,4 @@ async function setup() {
   console.log('Bot Telegram : webhook OK →', `${SITE}/api/telegram/webhook`);
 }
 
-module.exports = { enabled, mount, setup, notifyNewMessage, handleUpdate, _SECRET: SECRET };
+module.exports = { enabled, mount, setup, notifyNewMessage, handleUpdate, announce, _SECRET: SECRET };

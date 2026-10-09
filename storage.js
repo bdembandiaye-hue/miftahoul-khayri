@@ -20,8 +20,10 @@ if (useSupabase) {
   sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
 }
 
-const KEYS = { pdf: 'pdfs', photo: 'photos', audio: 'audios', event: 'events' };
-const FOLDER = { pdf: 'pdf', photo: 'photos', event: 'photos', audio: 'audios' };
+const KEYS = { pdf: 'pdfs', photo: 'photos', audio: 'audios', event: 'events', video: 'videos' };
+const FOLDER = { pdf: 'pdf', photo: 'photos', event: 'photos', audio: 'audios', video: 'photos' };
+const EMPTY = () => ({ pdfs: [], photos: [], audios: [], events: [], videos: [] });
+const readContent = () => ({ ...EMPTY(), ...readJSON(CONTENT_FILE, EMPTY()) });
 
 /* ---------- Local ---------- */
 function ensureLocal() {
@@ -70,11 +72,11 @@ async function removeFile(type, item) {
 async function getContent() {
   if (useSupabase) {
     const rows = check(await sb.from('items').select('id,type,data,created_at').order('created_at', { ascending: true }));
-    const db = { pdfs: [], photos: [], audios: [], events: [] };
+    const db = EMPTY();
     for (const r of rows) if (KEYS[r.type]) db[KEYS[r.type]].push({ ...r.data, id: r.id, createdAt: r.created_at });
     return db;
   }
-  return readJSON(CONTENT_FILE, { pdfs: [], photos: [], audios: [], events: [] });
+  return readContent();
 }
 
 async function addItem(type, item) {
@@ -84,7 +86,7 @@ async function addItem(type, item) {
     check(await sb.from('items').insert({ id, type, data, created_at: createdAt }));
     return item;
   }
-  const db = readJSON(CONTENT_FILE, { pdfs: [], photos: [], audios: [], events: [] });
+  const db = readContent();
   db[KEYS[type]].push(item);
   writeJSON(CONTENT_FILE, db);
   return item;
@@ -99,13 +101,48 @@ async function deleteItem(type, id) {
     check(await sb.from('items').delete().eq('id', id));
     return true;
   }
-  const db = readJSON(CONTENT_FILE, { pdfs: [], photos: [], audios: [], events: [] });
+  const db = readContent();
   const list = db[KEYS[type]], i = list.findIndex(x => x.id === id);
   if (i === -1) return false;
   await removeFile(type, list[i]);
   list.splice(i, 1);
   writeJSON(CONTENT_FILE, db);
   return true;
+}
+
+async function updateItem(type, id, patch) {
+  if (!KEYS[type]) return false;
+  if (useSupabase) {
+    const rows = check(await sb.from('items').select('id,data').eq('id', id).eq('type', type));
+    if (!rows.length) return false;
+    check(await sb.from('items').update({ data: { ...rows[0].data, ...patch } }).eq('id', id));
+    return true;
+  }
+  const db = readContent(), it = db[KEYS[type]].find(x => x.id === id);
+  if (!it) return false;
+  Object.assign(it, patch); writeJSON(CONTENT_FILE, db); return true;
+}
+
+/* ---------- Textes des pages (accueil, historique…) ---------- */
+// Supabase : table "items", type 'page', id 'page-<cle>', data { text }
+async function getPages() {
+  if (useSupabase) {
+    const rows = check(await sb.from('items').select('id,data').eq('type', 'page'));
+    const out = {};
+    for (const r of rows) out[r.id.replace(/^page-/, '')] = (r.data && r.data.text) || '';
+    return out;
+  }
+  return readContent().pages || {};
+}
+
+async function setPage(key, text) {
+  if (useSupabase) {
+    check(await sb.from('items').upsert({ id: 'page-' + key, type: 'page', data: { text, updatedAt: new Date().toISOString() } }));
+    return;
+  }
+  const db = readContent();
+  db.pages = { ...(db.pages || {}), [key]: text };
+  writeJSON(CONTENT_FILE, db);
 }
 
 /* ---------- Messages du formulaire ---------- */
@@ -151,4 +188,4 @@ async function deleteMessage(id) {
 
 if (!useSupabase) ensureLocal();
 
-module.exports = { useSupabase, PUBLIC, saveFile, getContent, addItem, deleteItem, getMessages, addMessage, setMessageRead, deleteMessage };
+module.exports = { useSupabase, PUBLIC, saveFile, removeFile, getContent, getPages, setPage, addItem, deleteItem, updateItem, getMessages, addMessage, setMessageRead, deleteMessage };

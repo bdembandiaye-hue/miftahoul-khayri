@@ -43,19 +43,32 @@ const allowed = {
   pdf: ['application/pdf'],
   photo: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
   audio: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/webm'],
-  event: ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+  event: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+  video: []
 };
+function youtubeId(u) {
+  const m = String(u || '').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/))([\w-]{11})/);
+  return m ? m[1] : (/^[\w-]{11}$/.test(String(u || '').trim()) ? String(u).trim() : null);
+}
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 45 * 1024 * 1024 }, // Supabase gratuit : 50 Mo max par fichier
   fileFilter: (req, file, cb) => {
-    const type = req.body.type;
+    const type = (req.params && req.params.type) || req.body.type; // params = modification
     if (!allowed[type] || !allowed[type].includes(file.mimetype)) return cb(new Error('Type de fichier non autorisé.'));
     cb(null, true);
   }
 });
 
 /* ---------- API contenus ---------- */
+app.get('/sitemap.xml', (req, res) => {
+  const base = (process.env.SITE_URL || process.env.RENDER_EXTERNAL_URL || 'https://dahira-miftahoul-khayri.onrender.com').replace(/\/$/, '');
+  const pages = ['', 'historique.html', 'xam-sa-dine.html', 'actualites.html', 'evenements.html', 'contact.html'];
+  const today = new Date().toISOString().slice(0, 10);
+  res.type('application/xml').send('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+    pages.map(p => `<url><loc>${base}/${p}</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>${p ? '0.8' : '1.0'}</priority></url>`).join('') + '</urlset>');
+});
+
 app.get('/api/health', (req, res) => res.json({ ok: true, storage: store.useSupabase ? 'supabase' : 'local' }));
 
 app.get('/api/content', wrap(async (req, res) => res.json(await store.getContent())));
@@ -79,6 +92,11 @@ app.post('/api/upload', requireAdmin, (req, res, next) => {
       if (!title || !type) return res.status(400).json({ error: 'Le titre et le type sont obligatoires.' });
       if (!allowed[type]) return res.status(400).json({ error: 'Type inconnu.' });
 
+      let youtube = null;
+      if (type === 'video') {
+        youtube = youtubeId(req.body.youtube);
+        if (!youtube) return res.status(400).json({ error: 'Lien YouTube invalide.' });
+      }
       const f = await store.saveFile(type, req.file);
       const item = {
         id: crypto.randomUUID(),
@@ -89,10 +107,63 @@ app.post('/api/upload', requireAdmin, (req, res, next) => {
         time: time || '',
         place: (place || '').trim(),
         ...f,
+        youtube,
         createdAt: new Date().toISOString()
       };
       await store.addItem(type, item);
+      bot.announce(type, item);
       res.json({ ok: true, item });
+    } catch (e) { next(e); }
+  });
+});
+
+/* ---------- Textes modifiables des pages ---------- */
+const PAGE_KEYS = ['accueil', 'historique'];
+app.get('/api/pages', wrap(async (req, res) => res.json(await store.getPages())));
+app.put('/api/pages/:key', requireAdmin, wrap(async (req, res) => {
+  const key = req.params.key;
+  if (!PAGE_KEYS.includes(key)) return res.status(400).json({ error: 'Page inconnue.' });
+  const text = String((req.body && req.body.text) || '').replace(/\r/g, '').slice(0, 20000);
+  await store.setPage(key, text);
+  res.json({ ok: true });
+}));
+
+/* ---------- Modifier un contenu ---------- */
+app.put('/api/content/:type/:id', requireAdmin, (req, res, next) => {
+  upload.single('file')(req, res, async (err) => {
+    try {
+      if (err) return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'Fichier trop lourd (45 Mo max).' : err.message });
+      const { type, id } = req.params;
+      if (!allowed[type]) return res.status(400).json({ error: 'Type inconnu.' });
+      const KEY = { pdf: 'pdfs', photo: 'photos', audio: 'audios', event: 'events', video: 'videos' }[type];
+      const old = ((await store.getContent())[KEY] || []).find(x => x.id === id);
+      if (!old) return res.status(404).json({ error: 'Contenu introuvable.' });
+
+      const b = req.body || {};
+      if (!b.title || !b.title.trim()) return res.status(400).json({ error: 'Le titre est obligatoire.' });
+      const patch = {
+        title: b.title.trim(),
+        description: (b.description || '').trim(),
+        section: b.section || old.section || '',
+        date: b.date || '',
+        time: b.time || '',
+        place: (b.place || '').trim(),
+        updatedAt: new Date().toISOString()
+      };
+      if (type === 'video') {
+        const yt = youtubeId(b.youtube);
+        if (!yt) return res.status(400).json({ error: 'Lien YouTube invalide.' });
+        patch.youtube = yt;
+      }
+      if (req.file) { // nouveau fichier : on remplace l'ancien
+        Object.assign(patch, await store.saveFile(type, req.file));
+        await store.removeFile(type, old).catch(() => {});
+      } else if (b.removeFile === '1' && old.filename) {
+        await store.removeFile(type, old).catch(() => {});
+        Object.assign(patch, { filename: null, originalName: null, url: null, storagePath: null });
+      }
+      await store.updateItem(type, id, patch);
+      res.json({ ok: true, item: { ...old, ...patch } });
     } catch (e) { next(e); }
   });
 });
