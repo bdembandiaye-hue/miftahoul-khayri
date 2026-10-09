@@ -2,7 +2,6 @@ require('dotenv').config();
 // nettoie les espaces/retours à la ligne collés par erreur dans les variables
 for (const k of ['ADMIN_USER','ADMIN_PASSWORD','ADMIN_PASSWORD_HASH','SUPABASE_URL','SUPABASE_SERVICE_KEY','SESSION_SECRET','TELEGRAM_BOT_TOKEN','TELEGRAM_ADMIN_CHAT_ID','GROQ_API_KEY']) if (process.env[k]) process.env[k] = process.env[k].trim();
 const express = require('express');
-const session = require('express-session');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
@@ -24,17 +23,26 @@ if (PROD && !process.env.ADMIN_PASSWORD && !process.env.ADMIN_PASSWORD_HASH) {
 app.set('trust proxy', 1); // Render est derrière un proxy (HTTPS + vraie IP)
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'change-this-secret-khayri',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: 'lax', secure: PROD, maxAge: 1000 * 60 * 60 * 8 }
-}));
+// Connexion admin par cookie signé : survit aux redémarrages / mises en veille de Render
+const SESSION_SECRET = process.env.SESSION_SECRET || 'change-this-secret-khayri';
+const ADMIN_COOKIE = 'khayri_admin', ADMIN_TTL = 1000 * 60 * 60 * 12; // 12 h
+const signTok = v => crypto.createHmac('sha256', SESSION_SECRET).update(v).digest('base64url');
+function makeAdminToken() { const v = 'admin.' + (Date.now() + ADMIN_TTL); return v + '.' + signTok(v); }
+function isAdmin(req) {
+  const m = (req.headers.cookie || '').match(new RegExp('(?:^|;\\s*)' + ADMIN_COOKIE + '=([^;]+)'));
+  if (!m) return false;
+  const tok = decodeURIComponent(m[1]), k = tok.lastIndexOf('.');
+  if (k < 0) return false;
+  const v = tok.slice(0, k), sig = tok.slice(k + 1), good = signTok(v);
+  if (sig.length !== good.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(good))) return false;
+  return Number(v.split('.')[1]) > Date.now();
+}
+const cookieOpts = { httpOnly: true, sameSite: 'lax', secure: PROD, maxAge: ADMIN_TTL, path: '/' };
 app.use(express.static(store.PUBLIC));
 
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 function requireAdmin(req, res, next) {
-  if (!req.session.admin) return res.status(401).json({ error: 'Accès administrateur requis.' });
+  if (!isAdmin(req)) return res.status(401).json({ error: 'Accès administrateur requis.' });
   next();
 }
 
@@ -78,11 +86,11 @@ app.post('/api/login', (req, res) => {
   if (username !== ADMIN_USER || !bcrypt.compareSync(password || '', ADMIN_PASSWORD_HASH)) {
     return res.status(401).json({ error: 'Identifiants incorrects.' });
   }
-  req.session.admin = true;
+  res.cookie(ADMIN_COOKIE, makeAdminToken(), cookieOpts);
   res.json({ ok: true });
 });
-app.post('/api/logout', (req, res) => req.session.destroy(() => res.json({ ok: true })));
-app.get('/api/me', (req, res) => res.json({ admin: !!req.session.admin }));
+app.post('/api/logout', (req, res) => { res.clearCookie(ADMIN_COOKIE, { path: '/' }); res.json({ ok: true }); });
+app.get('/api/me', (req, res) => res.json({ admin: isAdmin(req) }));
 
 app.post('/api/upload', requireAdmin, (req, res, next) => {
   upload.single('file')(req, res, async (err) => {

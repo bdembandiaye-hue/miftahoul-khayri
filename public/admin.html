@@ -22,6 +22,8 @@
 <footer>© 2026 <span>Dahira Miftahoul Khayri</span> — Administration</footer>
 <script src="script.js"></script><script>
 const loginBox=document.getElementById('loginBox'),dashboard=document.getElementById('dashboard');
+// si la connexion a expiré : on réaffiche le formulaire de connexion au lieu d'une erreur
+const _fetch=window.fetch.bind(window);window.fetch=async(...a)=>{const r=await _fetch(...a);if(r.status===401&&!String(a[0]).includes('/api/login')){loginBox.classList.remove('hidden');dashboard.classList.add('hidden');const m=document.getElementById('loginMsg');m.textContent='Session expirée : reconnectez-vous, puis recommencez.';m.className='error';window.scrollTo(0,0)}return r};
 async function check(){const r=await fetch('/api/me');const d=await r.json();if(d.admin){loginBox.classList.add('hidden');dashboard.classList.remove('hidden');loadList()}}
 check();
 document.getElementById('loginForm').addEventListener('submit',async e=>{e.preventDefault();const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username.value,password:password.value})});const d=await r.json();if(r.ok){loginBox.classList.add('hidden');dashboard.classList.remove('hidden');loginMsg.textContent='Connexion réussie.';loginMsg.className='success';loadList()}else{loginMsg.textContent=d.error;loginMsg.className='error'}});
