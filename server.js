@@ -90,7 +90,7 @@ app.post('/api/login', (req, res) => {
   res.json({ ok: true });
 });
 app.post('/api/logout', (req, res) => { res.clearCookie(ADMIN_COOKIE, { path: '/' }); res.json({ ok: true }); });
-app.get('/api/me', (req, res) => res.json({ admin: isAdmin(req) }));
+app.get('/api/me', (req, res) => res.json({ admin: isAdmin(req), channel: isAdmin(req) ? bot.channel : undefined }));
 
 app.post('/api/upload', requireAdmin, (req, res, next) => {
   upload.single('file')(req, res, async (err) => {
@@ -119,8 +119,9 @@ app.post('/api/upload', requireAdmin, (req, res, next) => {
         createdAt: new Date().toISOString()
       };
       await store.addItem(type, item);
-      bot.announce(type, item);
-      res.json({ ok: true, item });
+      // publication sur le canal Telegram seulement si la case est cochée
+      const telegram = req.body.publish === '1' ? await bot.announce(type, item, req.file) : null;
+      res.json({ ok: true, item, telegram });
     } catch (e) { next(e); }
   });
 });
@@ -134,6 +135,17 @@ app.put('/api/pages/:key', requireAdmin, wrap(async (req, res) => {
   const text = String((req.body && req.body.text) || '').replace(/\r/g, '').slice(0, 20000);
   await store.setPage(key, text);
   res.json({ ok: true });
+}));
+
+/* ---------- Publier / republier un contenu existant sur le canal Telegram ---------- */
+app.post('/api/content/:type/:id/announce', requireAdmin, wrap(async (req, res) => {
+  const KEY = { pdf: 'pdfs', photo: 'photos', audio: 'audios', event: 'events', video: 'videos' }[req.params.type];
+  if (!KEY) return res.status(400).json({ error: 'Type inconnu.' });
+  const item = ((await store.getContent())[KEY] || []).find(x => x.id === req.params.id);
+  if (!item) return res.status(404).json({ error: 'Contenu introuvable.' });
+  const r = await bot.announce(req.params.type, item);
+  if (!r.ok) return res.status(400).json({ error: r.error });
+  res.json(r);
 }));
 
 /* ---------- Modifier un contenu ---------- */

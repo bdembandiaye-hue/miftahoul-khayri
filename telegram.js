@@ -166,15 +166,72 @@ async function post(chat, text, photo) {
   return send(chat, text);
 }
 
-function announce(type, item) {
-  if (!enabled || !CHANNEL) return;
-  let text = null, photo = null;
-  if (type === 'event') { text = eventText(item, '🕌 <b>Nouvel événement du Daara</b>'); photo = fullUrl(item.url); }
-  else if (type === 'pdf') text = `📖 <b>Nouveau document : ${esc(item.title)}</b>${item.url ? `\n⬇️ ${fullUrl(item.url)}` : ''}\n\n${SITE}/xam-sa-dine.html`;
-  else if (type === 'photo') { text = `📸 <b>${esc(item.title)}</b>${item.description ? '\n' + esc(item.description) : ''}\n\n${SITE}/actualites.html`; photo = fullUrl(item.url); }
-  else if (type === 'audio') text = `🎧 <b>Nouvel audio : ${esc(item.title)}</b>\n${SITE}/actualites.html`;
-  else if (type === 'video') text = `🎬 <b>${esc(item.title)}</b>\nhttps://youtu.be/${item.youtube}\n\n${SITE}/actualites.html`;
-  if (text) post(CHANNEL, text, photo).catch(e => console.error('Annonce', e.message));
+/* Envoi d'un vrai fichier (PDF, audio, photo) à Telegram — jusqu'à 50 Mo */
+const MAX_TG = 49 * 1024 * 1024;
+async function sendFile(method, field, chat, file, caption, extra = {}) {
+  const fd = new FormData();
+  fd.append('chat_id', String(chat));
+  if (caption) { fd.append('caption', caption.slice(0, 1020)); fd.append('parse_mode', 'HTML'); }
+  for (const [k, v] of Object.entries(extra)) if (v) fd.append(k, String(v));
+  fd.append(field, new Blob([file.buffer], { type: file.mimetype || 'application/octet-stream' }), file.originalname || 'fichier');
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${TOKEN}/${method}`, { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!d.ok) console.error('Telegram', method, d.description);
+    return d;
+  } catch (e) { console.error('Telegram', method, e.message); return { ok: false, description: e.message }; }
+}
+
+// Récupère le fichier d'un contenu déjà en ligne (Supabase ou dossier local)
+async function loadFile(item) {
+  if (!item || !item.url) return null;
+  try {
+    let buffer;
+    if (item.url.startsWith('http')) {
+      const r = await fetch(item.url); if (!r.ok) return null;
+      buffer = Buffer.from(await r.arrayBuffer());
+    } else {
+      buffer = require('fs').readFileSync(require('path').join(__dirname, 'public', decodeURIComponent(item.url)));
+    }
+    const ext = (item.filename || '').split('.').pop().toLowerCase();
+    const mime = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', mp3: 'audio/mpeg', m4a: 'audio/mp4', ogg: 'audio/ogg', wav: 'audio/wav', aac: 'audio/aac' }[ext];
+    return { buffer, mimetype: mime, originalname: item.originalName || item.filename };
+  } catch (e) { console.error('Lecture fichier', e.message); return null; }
+}
+
+/* Publie un contenu sur le canal. file = fichier reçu à l'instant (sinon relu depuis le site).
+   Retourne { ok, error } pour l'afficher dans l'admin. */
+async function announce(type, item, file) {
+  if (!enabled || !CHANNEL) return { ok: false, error: 'Canal Telegram non configuré (TELEGRAM_CHANNEL_ID).' };
+  try {
+    if (!file && item.filename) file = await loadFile(item);
+    const big = file && file.buffer.length > MAX_TG;
+    let text, r;
+    if (type === 'event') {
+      text = eventText(item, '🕌 <b>Nouvel événement du Daara</b>');
+      r = file && !big ? await sendFile('sendPhoto', 'photo', CHANNEL, file, text) : null;
+      if (!r || !r.ok) r = await send(CHANNEL, text);
+    } else if (type === 'photo') {
+      text = `📸 <b>${esc(item.title)}</b>${item.description ? '\n' + esc(item.description) : ''}\n\n👉 ${SITE}/actualites.html`;
+      r = file && !big ? await sendFile('sendPhoto', 'photo', CHANNEL, file, text) : null;
+      if (!r || !r.ok) r = file && !big ? await sendFile('sendDocument', 'document', CHANNEL, file, text) : null; // photo > 10 Mo
+      if (!r || !r.ok) r = await post(CHANNEL, text, fullUrl(item.url));
+    } else if (type === 'pdf') {
+      text = `📖 <b>${esc(item.title)}</b>${item.description ? '\n' + esc(item.description) : ''}\n\n👉 ${SITE}/xam-sa-dine.html`;
+      r = file && !big ? await sendFile('sendDocument', 'document', CHANNEL, file, text) : null;
+      if (!r || !r.ok) r = await send(CHANNEL, text + (item.url ? `\n⬇️ ${fullUrl(item.url)}` : ''));
+    } else if (type === 'audio') {
+      text = `🎧 <b>${esc(item.title)}</b>${item.description ? '\n' + esc(item.description) : ''}\n\n👉 ${SITE}/actualites.html`;
+      r = file && !big ? await sendFile('sendAudio', 'audio', CHANNEL, file, text, { title: item.title, performer: 'Daara Miftahoul Khayri' }) : null;
+      if (!r || !r.ok) r = await send(CHANNEL, text + (item.url ? `\n⬇️ ${fullUrl(item.url)}` : ''));
+    } else if (type === 'video') {
+      text = `🎬 <b>${esc(item.title)}</b>${item.description ? '\n' + esc(item.description) : ''}\n\n▶️ https://youtu.be/${item.youtube}`;
+      r = await tg('sendMessage', { chat_id: CHANNEL, text, parse_mode: 'HTML' }); // aperçu YouTube affiché
+    } else return { ok: false, error: 'Type non publiable.' };
+    if (r && r.ok) return { ok: true, note: big ? 'Fichier trop lourd pour Telegram (50 Mo) : lien publié à la place.' : '' };
+    const why = (r && r.description) || 'erreur inconnue';
+    return { ok: false, error: /chat not found|not enough rights|administrator/i.test(why) ? 'Le bot doit être administrateur du canal ' + CHANNEL + '.' : why };
+  } catch (e) { console.error('Annonce', e.message); return { ok: false, error: e.message }; }
 }
 
 /* ---------- Rappel automatique la veille de chaque événement ---------- */
@@ -242,4 +299,4 @@ async function setup() {
   console.log('Bot Telegram : webhook OK →', `${SITE}/api/telegram/webhook`);
 }
 
-module.exports = { enabled, mount, setup, notifyNewMessage, handleUpdate, announce, _SECRET: SECRET };
+module.exports = { enabled, channel: !!CHANNEL, mount, setup, notifyNewMessage, handleUpdate, announce, _SECRET: SECRET };
