@@ -41,6 +41,7 @@ async function tg(method, body) {
 const send = (chat_id, text, extra = {}) =>
   tg('sendMessage', { chat_id, text, parse_mode: 'HTML', disable_web_page_preview: true, ...extra });
 
+const BUTTONS = new Set(['📅 Événements', '📖 Xam sa diné', '🤝 Rejoindre le Daara', '📍 Adresse', '🕌 Historique', '👥 Membres', '📰 Actualités', '📞 Contact']);
 const MENU = {
   reply_markup: {
     keyboard: [
@@ -101,7 +102,7 @@ async function actusText(store) {
 }
 
 const T = {
-  start: n => `Assalamou aleykoum ${esc(n || '')} 🤲🏾\n\nBienvenue sur le bot du <b>${INFO.nom}</b> (${INFO.arabe}).\n<i>${INFO.devise}</i>\n\nChoisissez une option ci-dessous ou posez-moi votre question.`,
+  start: n => `Assalamou aleykoum ${esc(n || '')} 🤲🏾\n\nBienvenue sur le bot du <b>${INFO.nom}</b> (${INFO.arabe}).\n<i>${INFO.devise}</i>\n\nChoisissez une option ci-dessous ou posez-moi votre question.\n\n🔎 Vous pouvez aussi écrire <b>un nom</b> (ex : <i>Baye Demba</i>) pour retrouver tous les événements, photos, vidéos et audios qui le concernent.`,
   rejoindre: () => `🤝 <b>Rejoindre le Daara</b>\n\nRemplissez le formulaire, un responsable vous recontactera :\n👉 ${SITE}/contact.html\n\nOu écrivez-nous sur WhatsApp : ${INFO.wa}`,
   adresse: () => `📍 <b>Adresse</b>\n${INFO.lieu}\n\nItinéraire : https://www.google.com/maps/dir/?api=1&destination=14.798387,-16.938859\nCarte : ${SITE}/contact.html#carte`,
   contact: () => `📞 <b>Contact</b>\nTéléphone / WhatsApp : ${INFO.tel}\nWhatsApp : ${INFO.wa}\nSite : ${SITE}`,
@@ -146,6 +147,76 @@ Si tu ne connais pas la réponse (horaires, cotisations, règles internes…), n
   } catch (e) { console.error('Groq', e.message); return null; }
 }
 
+
+/* ---------- Recherche dans tout le site (nom d'une personne, d'un événement…) ---------- */
+const norm = x => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9؀-ۿ]+/g, ' ').trim();
+const STOP = new Set(('le la les l de d du des un une et ou a au aux en pour par sur avec dans qui que qu quoi quand est sont c ce cet cette ces ' +
+  'mon ma mes ton ta tes son sa ses je j tu il elle on nous vous ils me m te t se s y quel quelle quels quelles comment combien ' +
+  'info infos information informations voir vois montre montrer donne donner dis moi svp stp merci tout tous toutes chose choses ' +
+  'lie liee lies concernant propos daara dahira miftahoul miftahul khayri xayri khayr bot veux voudrais peux fait fais faire avoir ' +
+  'il y a avait ete etait yi bi ci ak na nga ngi').split(' '));
+const CAT = { magal: 'event', kurel: 'event', ziar: 'event', ziarra: 'event', wazifa: 'event', evenement: 'event', evenements: 'event', activite: 'event', activites: 'event', ceremonie: 'event', conference: 'event', programme: 'event',
+  photo: 'photo', photos: 'photo', image: 'photo', images: 'photo', video: 'video', videos: 'video', youtube: 'video',
+  audio: 'audio', audios: 'audio', xassida: 'audio', xassaide: 'audio', xassaides: 'audio', khassida: 'audio',
+  pdf: 'pdf', document: 'pdf', documents: 'pdf', livre: 'pdf', membre: 'member', membres: 'member', responsable: 'member', responsables: 'member' };
+// mots des boutons / questions habituelles : ils ne servent pas à chercher un nom
+const RULEWORDS = new Set(('rejoindre integrer inscrire inscription adherer devenir adresse localisation itineraire carte situe trouve trouver ' +
+  'contact telephone numero appeler joindre whatsapp historique histoire cree fondateur fonde site lien canal chaine annonce annonces ' +
+  'actualites actualite nouveautes nouvelles dernier derniers derniere dernieres prochain prochains prochaine quand xam dine menu aide start ' +
+  'salam bonjour bonsoir salut asalam assalamou aleykoum nanga def chercher cherche recherche').split(' '));
+
+function keywords(q) {
+  const toks = norm(q).split(' ').filter(t => t.length >= 2 && !STOP.has(t));
+  const types = new Set(toks.filter(t => CAT[t]).map(t => CAT[t]));
+  const names = toks.filter(t => !CAT[t] && !RULEWORDS.has(t));
+  return { types, names };
+}
+const hasTok = (txt, t) => t.length >= 3 ? txt.includes(t) : (' ' + txt + ' ').includes(' ' + t + ' ');
+const frShort = iso => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }); } catch (e) { return ''; } };
+const cut = (t, n) => { t = String(t || '').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+
+async function searchSite(q, store) {
+  const { types, names } = keywords(q);
+  if (!names.length) return null;
+  const db = await store.getContent();
+  const pool = [
+    ...db.events.map(x => ({ ...x, _t: 'event' })), ...db.photos.map(x => ({ ...x, _t: 'photo' })),
+    ...(db.videos || []).map(x => ({ ...x, _t: 'video' })), ...db.audios.map(x => ({ ...x, _t: 'audio' })),
+    ...db.pdfs.map(x => ({ ...x, _t: 'pdf' })), ...(db.members || []).map(x => ({ ...x, _t: 'member' }))
+  ].filter(x => !types.size || types.has(x._t));
+  const found = pool.filter(x => { const txt = norm([x.title, x.description, x.place, x.role, x.originalName].join(' ')); return names.every(t => hasTok(txt, t)); });
+  let hist = null;
+  if (!types.size) {
+    let h = ''; try { h = ((await store.getPages()) || {}).historique || ''; } catch (e) {}
+    const phrases = h.replace(/\*\*/g, '').split(/(?<=[.!?\n])\s+/);
+    const p = phrases.find(ph => { const n = norm(ph); return names.every(t => hasTok(n, t)); });
+    if (p) hist = p;
+  }
+  if (!found.length && !hist) return null;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const lien = x => x.url ? (x.url.startsWith('http') ? x.url : SITE + x.url) : '';
+  const out = [`🔎 <b>Résultats pour « ${esc(cut(q, 60))} »</b>`];
+  const ev = found.filter(x => x._t === 'event').sort((a, b) => {
+    const fa = (a.date || '9') >= today, fb = (b.date || '9') >= today;
+    return fa !== fb ? (fa ? -1 : 1) : (fa ? String(a.date).localeCompare(String(b.date)) : String(b.date).localeCompare(String(a.date)));
+  });
+  if (ev.length) out.push('\n📅 <b>Événements</b>\n' + ev.slice(0, 8).map(e =>
+    `• <b>${esc(e.title)}</b>${(e.date || '9') >= today ? ' <i>(à venir)</i>' : ''}\n   ${esc(frDate(e.date))}${e.time ? ' à ' + esc(e.time) : ''}${e.place ? ' — 📍 ' + esc(e.place) : ''}` +
+    (e.description ? `\n   ${esc(cut(e.description, 140))}` : '')).join('\n'));
+  const mem = found.filter(x => x._t === 'member');
+  if (mem.length) out.push('\n👤 <b>Membres</b>\n' + mem.map(x => `• <b>${esc(x.title)}</b>${x.role ? ' — ' + esc(x.role) : ''}${x.description ? '\n   ' + esc(cut(x.description, 120)) : ''}`).join('\n'));
+  const media = [['photo', '📸 <b>Photos</b>'], ['video', '🎬 <b>Vidéos</b>'], ['audio', '🎧 <b>Audios</b>'], ['pdf', '📖 <b>Documents</b>']];
+  for (const [t, titre] of media) {
+    const l = found.filter(x => x._t === t).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    if (l.length) out.push('\n' + titre + '\n' + l.slice(0, 6).map(x => `• <b>${esc(x.title)}</b>${x.createdAt ? ' — ' + esc(frShort(x.createdAt)) : ''}` +
+      (t === 'video' ? `\n   https://youtu.be/${x.youtube}` : lien(x) ? `\n   ${lien(x)}` : '')).join('\n'));
+  }
+  if (hist) out.push(`\n🕌 <b>Historique</b>\n« ${esc(cut(hist, 300))} »\n${SITE}/historique.html`);
+  out.push(`\n🌐 ${SITE}`);
+  return out.join('\n').slice(0, 4000);
+}
+
 async function handleUpdate(update, store) {
   const m = update.message || update.edited_message;
   if (!m || !m.text) return;
@@ -158,6 +229,18 @@ async function handleUpdate(update, store) {
   const isGroup = m.chat.type !== 'private';
   if (isGroup && !text.startsWith('/') && !/khayri|bot/i.test(text)) return;
 
+  // /chercher <nom>
+  const cm = text.match(/^\/(chercher|recherche|search)(?:@\w+)?\s*(.*)$/i);
+  if (cm) {
+    if (!cm[2].trim()) return send(chat, '🔎 Tapez /chercher suivi d\'un nom ou d\'un mot.\nExemple : <code>/chercher Baye Demba</code>');
+    return send(chat, (await searchSite(cm[2], store)) || `🔎 Aucun résultat pour « ${esc(cm[2])} ».\nEssayez avec un autre mot ou une autre orthographe.`);
+  }
+  // texte libre (un nom…) : on cherche d'abord dans le site, sauf pour les boutons du menu
+  if (!text.startsWith('/') && !BUTTONS.has(text)) {
+    const r = await searchSite(text, store).catch(() => null);
+    if (r) return send(chat, r);
+  }
+
   for (const [re, fn] of RULES) {
     if (re.test(text)) {
       const out = await fn(store, m);
@@ -166,6 +249,10 @@ async function handleUpdate(update, store) {
   }
   await tg('sendChatAction', { chat_id: chat, action: 'typing' });
   const ai = await askAI(text, store);
+  if (!ai) {
+    const { names } = keywords(text);
+    if (names.length && names.length <= 4) return send(chat, `🔎 Je n'ai rien trouvé sur le site pour « ${esc(cut(text, 60))} ».\nVérifiez l'orthographe, essayez un seul mot (ex : un prénom), ou utilisez le menu ci-dessous.`, MENU);
+  }
   return send(chat, ai || T.inconnu(), MENU);
 }
 
@@ -332,7 +419,8 @@ async function setup() {
     { command: 'contact', description: 'Téléphone / WhatsApp' },
     { command: 'historique', description: 'Histoire du Dahira' },
     { command: 'membres', description: 'Membres et responsables' },
-    { command: 'actualites', description: 'Dernières photos, vidéos et audios' }
+    { command: 'actualites', description: 'Dernières photos, vidéos et audios' },
+    { command: 'chercher', description: 'Chercher un nom (ex : /chercher Baye Demba)' }
   ] });
   console.log('Bot Telegram : webhook OK →', `${SITE}/api/telegram/webhook`);
 }
