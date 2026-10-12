@@ -67,7 +67,9 @@ const I18N = {
   'Aucune photo publiée.':['Amul nataal ba léegi.','لا توجد صور منشورة بعد.'],'Aucune vidéo publiée.':['Amul wideyo ba léegi.','لا توجد فيديوهات منشورة بعد.'],
   'Aucun audio publié.':['Amul kàddu ba léegi.','لا توجد تسجيلات صوتية بعد.'],'Aucun événement publié pour le moment.':['Amul xew-xew ba léegi.','لا توجد فعاليات منشورة حاليًا.'],
   'Date à venir':['Bés bi dina ñëw','الموعد لاحقًا'],
-  'Merci de corriger les champs en rouge.':['Defaral bërëb yu xonq yi.','يرجى تصحيح الحقول الحمراء.'],'Envoi en cours…':['Mi ngi yónne…','جارٍ الإرسال…']
+  'Merci de corriger les champs en rouge.':['Defaral bërëb yu xonq yi.','يرجى تصحيح الحقول الحمراء.'],'Envoi en cours…':['Mi ngi yónne…','جارٍ الإرسال…'],
+  'membres':['bokk yi','الأعضاء'],'Les membres et responsables du Dahira Miftahoul Khayri.':['Ñi bokk ak njiiti Dahira Miftahoul Khayri.','أعضاء دائرة مفتاح الخير ومسؤولوها.'],
+  'La liste des membres sera bientôt publiée.':['Limu ñi bokk dina ñëw ci kanam.','ستُنشر قائمة الأعضاء قريبًا.'],'Impossible de charger les membres.':['Mënul a yeb ñi bokk.','تعذّر تحميل الأعضاء.']
 };
 const LANGS = { fr: 'FR', wo: 'WO', ar: 'عربي' };
 const ATTRS = ['placeholder', 'aria-label', 'title'];

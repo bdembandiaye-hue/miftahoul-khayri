@@ -52,7 +52,8 @@ const allowed = {
   photo: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
   audio: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/webm'],
   event: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
-  video: []
+  video: [],
+  member: ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 };
 function youtubeId(u) {
   const m = String(u || '').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/))([\w-]{11})/);
@@ -116,6 +117,8 @@ app.post('/api/upload', requireAdmin, (req, res, next) => {
         place: (place || '').trim(),
         ...f,
         youtube,
+        role: (req.body.role || '').trim().slice(0, 80),
+        ordre: parseInt(req.body.ordre, 10) || 0,
         createdAt: new Date().toISOString()
       };
       await store.addItem(type, item);
@@ -139,7 +142,7 @@ app.put('/api/pages/:key', requireAdmin, wrap(async (req, res) => {
 
 /* ---------- Publier / republier un contenu existant sur le canal Telegram ---------- */
 app.post('/api/content/:type/:id/announce', requireAdmin, wrap(async (req, res) => {
-  const KEY = { pdf: 'pdfs', photo: 'photos', audio: 'audios', event: 'events', video: 'videos' }[req.params.type];
+  const KEY = { pdf: 'pdfs', photo: 'photos', audio: 'audios', event: 'events', video: 'videos', member: 'members' }[req.params.type];
   if (!KEY) return res.status(400).json({ error: 'Type inconnu.' });
   const item = ((await store.getContent())[KEY] || []).find(x => x.id === req.params.id);
   if (!item) return res.status(404).json({ error: 'Contenu introuvable.' });
@@ -155,7 +158,7 @@ app.put('/api/content/:type/:id', requireAdmin, (req, res, next) => {
       if (err) return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'Fichier trop lourd (45 Mo max).' : err.message });
       const { type, id } = req.params;
       if (!allowed[type]) return res.status(400).json({ error: 'Type inconnu.' });
-      const KEY = { pdf: 'pdfs', photo: 'photos', audio: 'audios', event: 'events', video: 'videos' }[type];
+      const KEY = { pdf: 'pdfs', photo: 'photos', audio: 'audios', event: 'events', video: 'videos', member: 'members' }[type];
       const old = ((await store.getContent())[KEY] || []).find(x => x.id === id);
       if (!old) return res.status(404).json({ error: 'Contenu introuvable.' });
 
@@ -168,6 +171,8 @@ app.put('/api/content/:type/:id', requireAdmin, (req, res, next) => {
         date: b.date || '',
         time: b.time || '',
         place: (b.place || '').trim(),
+        role: (b.role || '').trim().slice(0, 80),
+        ordre: parseInt(b.ordre, 10) || 0,
         updatedAt: new Date().toISOString()
       };
       if (type === 'video') {

@@ -20,9 +20,9 @@ if (useSupabase) {
   sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
 }
 
-const KEYS = { pdf: 'pdfs', photo: 'photos', audio: 'audios', event: 'events', video: 'videos' };
-const FOLDER = { pdf: 'pdf', photo: 'photos', event: 'photos', audio: 'audios', video: 'photos' };
-const EMPTY = () => ({ pdfs: [], photos: [], audios: [], events: [], videos: [] });
+const KEYS = { pdf: 'pdfs', photo: 'photos', audio: 'audios', event: 'events', video: 'videos', member: 'members' };
+const FOLDER = { pdf: 'pdf', photo: 'photos', event: 'photos', audio: 'audios', video: 'photos', member: 'photos' };
+const EMPTY = () => ({ pdfs: [], photos: [], audios: [], events: [], videos: [], members: [] });
 const readContent = () => ({ ...EMPTY(), ...readJSON(CONTENT_FILE, EMPTY()) });
 
 /* ---------- Local ---------- */
