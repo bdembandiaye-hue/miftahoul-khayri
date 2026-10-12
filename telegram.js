@@ -46,7 +46,8 @@ const MENU = {
     keyboard: [
       [{ text: '📅 Événements' }, { text: '📖 Xam sa diné' }],
       [{ text: '🤝 Rejoindre le Daara' }, { text: '📍 Adresse' }],
-      [{ text: '📞 Contact' }, { text: '🕌 Historique' }]
+      [{ text: '🕌 Historique' }, { text: '👥 Membres' }],
+      [{ text: '📰 Actualités' }, { text: '📞 Contact' }]
     ],
     resize_keyboard: true
   }
@@ -69,6 +70,36 @@ async function pdfText(store) {
   return '📖 <b>Xam sa diné</b>\n\n' + (lines.join('\n') || 'Aucun document pour le moment.') + `\n\n${SITE}/xam-sa-dine.html`;
 }
 
+// texte du site -> HTML Telegram (**gras**)
+const richTg = t => esc(String(t || '').trim()).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+
+async function histoireText(store) {
+  let txt = '';
+  try { txt = ((await store.getPages()) || {}).historique || ''; } catch (e) {}
+  const corps = txt.trim() ? richTg(txt).slice(0, 3500) : esc(INFO.histoire);
+  return `🕌 <b>Historique</b>\n\n${corps}\n\nEn savoir plus : ${SITE}/historique.html`;
+}
+
+async function membresText(store) {
+  const m = [...((await store.getContent()).members || [])]
+    .sort((a, b) => ((a.ordre || 999) - (b.ordre || 999)) || String(a.createdAt).localeCompare(String(b.createdAt)));
+  if (!m.length) return `👥 La liste des membres sera bientôt publiée.\n${SITE}/historique.html`;
+  return '👥 <b>Membres du Dahira</b>\n\n' + m.slice(0, 40).map(x => `• <b>${esc(x.title)}</b>${x.role ? ' — ' + esc(x.role) : ''}`).join('\n') +
+    (m.length > 40 ? `\n… et ${m.length - 40} autres` : '') + `\n\nPhotos et détails : ${SITE}/historique.html`;
+}
+
+async function actusText(store) {
+  const db = await store.getContent();
+  const all = [
+    ...db.photos.map(x => ({ ...x, ic: '📸', lien: x.url ? (x.url.startsWith('http') ? x.url : SITE + x.url) : '' })),
+    ...(db.videos || []).map(x => ({ ...x, ic: '🎬', lien: 'https://youtu.be/' + x.youtube })),
+    ...db.audios.map(x => ({ ...x, ic: '🎧', lien: x.url ? (x.url.startsWith('http') ? x.url : SITE + x.url) : '' }))
+  ].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 8);
+  if (!all.length) return `📰 Aucune actualité publiée pour le moment.\n${SITE}/actualites.html`;
+  return '📰 <b>Dernières actualités</b>\n\n' + all.map(x => `${x.ic} <b>${esc(x.title)}</b>${x.lien ? `\n   ${x.lien}` : ''}`).join('\n') +
+    `\n\nTout voir : ${SITE}/actualites.html`;
+}
+
 const T = {
   start: n => `Assalamou aleykoum ${esc(n || '')} 🤲🏾\n\nBienvenue sur le bot du <b>${INFO.nom}</b> (${INFO.arabe}).\n<i>${INFO.devise}</i>\n\nChoisissez une option ci-dessous ou posez-moi votre question.`,
   rejoindre: () => `🤝 <b>Rejoindre le Daara</b>\n\nRemplissez le formulaire, un responsable vous recontactera :\n👉 ${SITE}/contact.html\n\nOu écrivez-nous sur WhatsApp : ${INFO.wa}`,
@@ -83,10 +114,12 @@ const RULES = [
   [/(^\/start|salam|bonjour|bonsoir|^salut|nanga def|asalam)/i, (s, m) => T.start(m.from && m.from.first_name)],
   [/(^\/evenements|év[eé]nement|evenement|activit|programme|magal|kazu|ziar|wazifa|quand)/i, s => eventsText(s)],
   [/(^\/xam|xam sa|pdf|tazawoud|massalik|choubane|sikhar|document|xassa[iï]d|livre)/i, s => pdfText(s)],
-  [/(^\/rejoindre|rejoindre|int[eé]grer|inscri|membre|adh[eé]rer|devenir)/i, () => T.rejoindre()],
+  [/(^\/rejoindre|rejoindre|int[eé]grer|inscri|adh[eé]rer|devenir)/i, () => T.rejoindre()],
+  [/(^\/membres|membre|bureau|responsable|diaraaf|jaraaf|pr[eé]sident|tr[eé]sorier|secr[eé]taire)/i, s => membresText(s)],
+  [/(^\/actualites|actualit|nouveaut|nouvelles|photos?\b|audios?\b|derni)/i, s => actusText(s)],
   [/(^\/adresse|adresse|o[uù] se trouve|localisation|itin[eé]raire|carte|diakhao|situ[eé])/i, () => T.adresse()],
   [/(^\/contact|contact|t[eé]l[eé]phone|num[eé]ro|appeler|whatsapp|joindre)/i, () => T.contact()],
-  [/(^\/historique|histoire|historique|cr[eé][eé]|fondateur|fond[eé]|serigne saliou)/i, () => T.histoire()],
+  [/(^\/historique|histoire|historique|cr[eé][eé]|fondateur|fond[eé]|serigne saliou)/i, s => histoireText(s)],
   [/(^\/canal|canal|cha[iî]ne|annonce)/i, () => CHANNEL ? `📢 Rejoignez notre canal d'annonces : ${CHANNEL.startsWith('@') ? 'https://t.me/' + CHANNEL.slice(1) : CHANNEL}` : `📢 Canal d'annonces bientôt disponible.`],
   [/(^\/youtube|youtube|vid[eé]o|kurel tv)/i, () => `🎬 Notre chaîne YouTube : https://www.youtube.com/@kurelmiftaahulxayritv\nVidéos aussi sur ${SITE}/actualites.html`],
   [/(^\/site|site web|site internet|lien)/i, () => `🌐 ${SITE}`]
@@ -95,9 +128,12 @@ const RULES = [
 async function askAI(question, store) {
   if (!GROQ_KEY) return null;
   try {
-    const events = (await store.getContent()).events.map(e => `${e.title} (${e.date || 'date à venir'}${e.place ? ', ' + e.place : ''})`).join('; ') || 'aucun';
+    const dbAI = await store.getContent();
+    let hist = ''; try { hist = ((await store.getPages()) || {}).historique || ''; } catch (e) {}
+    const membres = (dbAI.members || []).map(x => x.title + (x.role ? ' (' + x.role + ')' : '')).join('; ') || 'non publiés';
+    const events = dbAI.events.map(e => `${e.title} (${e.date || 'date à venir'}${e.place ? ', ' + e.place : ''})`).join('; ') || 'aucun';
     const system = `Tu es l'assistant du ${INFO.nom} (${INFO.lieu}). Réponds en français simple (ou en wolof si on te parle wolof), poliment, en 4 phrases maximum.
-Faits connus : ${INFO.histoire} Devise : ${INFO.devise}. Téléphone/WhatsApp : ${INFO.tel}. Site : ${SITE}. Formulaire pour rejoindre : ${SITE}/contact.html. Événements publiés : ${events}.
+Faits connus : ${INFO.histoire} Devise : ${INFO.devise}. Téléphone/WhatsApp : ${INFO.tel}. Site : ${SITE}. Formulaire pour rejoindre : ${SITE}/contact.html. Événements publiés : ${events}. Membres et responsables : ${membres}. Historique publié : ${hist.replace(/\*\*/g, '').slice(0, 1500)}.
 Si tu ne connais pas la réponse (horaires, cotisations, règles internes…), ne l'invente pas : dis de contacter le ${INFO.tel}. Ne donne jamais d'avis religieux (fatwa) : oriente vers un Serigne du Daara.`;
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -294,7 +330,9 @@ async function setup() {
     { command: 'rejoindre', description: 'Rejoindre le Daara' },
     { command: 'adresse', description: 'Adresse et itinéraire' },
     { command: 'contact', description: 'Téléphone / WhatsApp' },
-    { command: 'historique', description: 'Histoire du Dahira' }
+    { command: 'historique', description: 'Histoire du Dahira' },
+    { command: 'membres', description: 'Membres et responsables' },
+    { command: 'actualites', description: 'Dernières photos, vidéos et audios' }
   ] });
   console.log('Bot Telegram : webhook OK →', `${SITE}/api/telegram/webhook`);
 }
