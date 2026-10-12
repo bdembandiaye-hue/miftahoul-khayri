@@ -1,4 +1,9 @@
-async function getContent(){const r=await fetch('/api/content');return r.json()}
+// une seule requête par page, partagée par tous les blocs ; nouvel essai automatique si le réseau coupe
+let _contentP=null;
+function getContent(){
+  if(!_contentP)_contentP=(async()=>{for(let i=0;i<3;i++){try{const r=await fetch('/api/content');if(r.ok)return await r.json()}catch(e){}await new Promise(ok=>setTimeout(ok,800*(i+1)))}_contentP=null;return{pdfs:[],photos:[],audios:[],events:[],videos:[],members:[]}})();
+  return _contentP;
+}
 function escapeHTML(value=''){return String(value).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function navActive(){const page=location.pathname.split('/').pop()||'index.html';document.querySelectorAll('.menu a').forEach(a=>{if(a.getAttribute('href')===page)a.classList.add('active')})}
 function burgerMenu(){

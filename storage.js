@@ -188,4 +188,41 @@ async function deleteMessage(id) {
 
 if (!useSupabase) ensureLocal();
 
-module.exports = { useSupabase, PUBLIC, saveFile, removeFile, getContent, getPages, setPage, addItem, deleteItem, updateItem, getMessages, addMessage, setMessageRead, deleteMessage };
+/* ---------- Cache mémoire (tenue en charge : 400+ visiteurs simultanés) ----------
+ * Les contenus sont lus UNE fois puis gardés en mémoire ; 400 visiteurs = 1 seule requête Supabase.
+ * - toute modification (ajout, édition, suppression, textes) vide le cache immédiatement ;
+ * - les requêtes simultanées partagent la même lecture en cours (pas d'avalanche) ;
+ * - si Supabase est lent ou en panne, on continue de servir la dernière copie connue.
+ */
+const CACHE_TTL = Number(process.env.CACHE_TTL_MS || 60000); // 60 s par défaut
+function cached(loader) {
+  let value = null, at = 0, pending = null, version = 0;
+  const load = () => {
+    if (pending) return pending;
+    const v = version;
+    pending = loader().then(r => { if (v === version) { value = r; at = Date.now(); } return r; })
+      .catch(e => { if (value) { console.error('Cache : lecture échouée, ancienne copie servie —', e.message); return value; } throw e; })
+      .finally(() => { pending = null; });
+    return pending;
+  };
+  const get = async () => {
+    if (value && Date.now() - at < CACHE_TTL) return value;
+    if (value) { load().catch(() => {}); return value; } // copie servie tout de suite, rafraîchie en arrière-plan
+    return load();
+  };
+  get.clear = () => { version++; value = null; at = 0; pending = null; };
+  get.stamp = () => at;
+  return get;
+}
+const getContentCached = cached(getContent);
+const getPagesCached = cached(getPages);
+function invalidate() { getContentCached.clear(); getPagesCached.clear(); }
+const after = fn => async (...a) => { try { return await fn(...a); } finally { invalidate(); } };
+
+module.exports = {
+  useSupabase, PUBLIC, saveFile, removeFile,
+  getContent: getContentCached, getPages: getPagesCached, invalidate,
+  contentStamp: () => getContentCached.stamp(),
+  setPage: after(setPage), addItem: after(addItem), deleteItem: after(deleteItem), updateItem: after(updateItem),
+  getMessages, addMessage, setMessageRead, deleteMessage
+};

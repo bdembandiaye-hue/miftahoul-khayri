@@ -2,9 +2,11 @@ require('dotenv').config();
 // nettoie les espaces/retours à la ligne collés par erreur dans les variables
 for (const k of ['ADMIN_USER','ADMIN_PASSWORD','ADMIN_PASSWORD_HASH','SUPABASE_URL','SUPABASE_SERVICE_KEY','SESSION_SECRET','TELEGRAM_BOT_TOKEN','TELEGRAM_ADMIN_CHAT_ID','GROQ_API_KEY']) if (process.env[k]) process.env[k] = process.env[k].trim();
 const express = require('express');
+const compression = require('compression');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const store = require('./storage');
 const bot = require('./telegram');
 
@@ -21,6 +23,19 @@ if (PROD && !process.env.ADMIN_PASSWORD && !process.env.ADMIN_PASSWORD_HASH) {
 }
 
 app.set('trust proxy', 1); // Render est derrière un proxy (HTTPS + vraie IP)
+app.disable('x-powered-by');
+app.use(compression()); // pages et données compressées (gzip) : 3 à 5 fois plus légères
+
+/* Anti-abus global : limite large par IP (plusieurs personnes peuvent partager la même IP mobile) */
+const apiHits = new Map(), WINDOW = 60000, MAX_PER_MIN = Number(process.env.RATE_LIMIT_PER_MIN || 600);
+setInterval(() => { const now = Date.now(); for (const [ip, h] of apiHits) if (now - h.t > WINDOW) apiHits.delete(ip); }, WINDOW).unref();
+app.use('/api', (req, res, next) => {
+  const ip = req.ip || 'x', now = Date.now();
+  let h = apiHits.get(ip);
+  if (!h || now - h.t > WINDOW) { h = { t: now, n: 0 }; apiHits.set(ip, h); }
+  if (++h.n > MAX_PER_MIN) return res.status(429).json({ error: 'Trop de requêtes, réessayez dans une minute.' });
+  next();
+});
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 // Connexion admin par cookie signé : survit aux redémarrages / mises en veille de Render
@@ -38,7 +53,14 @@ function isAdmin(req) {
   return Number(v.split('.')[1]) > Date.now();
 }
 const cookieOpts = { httpOnly: true, sameSite: 'lax', secure: PROD, maxAge: ADMIN_TTL, path: '/' };
-app.use(express.static(store.PUBLIC));
+app.use(express.static(store.PUBLIC, {
+  etag: true, lastModified: true,
+  setHeaders(res, file) {
+    if (/\.html?$/.test(file)) res.setHeader('Cache-Control', 'no-cache'); // toujours la dernière version (304 si inchangée)
+    else if (/[\\/]uploads[\\/]/.test(file) || /\.(png|jpe?g|webp|gif|svg|ico|mp3|m4a|ogg|pdf|woff2?)$/i.test(file)) res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 jours
+    else res.setHeader('Cache-Control', 'public, max-age=3600'); // css/js : 1 h
+  }
+}));
 
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 function requireAdmin(req, res, next) {
@@ -80,7 +102,21 @@ app.get('/sitemap.xml', (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ ok: true, storage: store.useSupabase ? 'supabase' : 'local' }));
 
-app.get('/api/content', wrap(async (req, res) => res.json(await store.getContent())));
+// Données servies depuis le cache mémoire, avec ETag : un visiteur qui revient reçoit « 304 » (0 octet)
+let contentJSON = { stamp: -1, body: '', etag: '' };
+app.get('/api/content', wrap(async (req, res) => {
+  const data = await store.getContent(), stamp = store.contentStamp();
+  if (contentJSON.stamp !== stamp || contentJSON.data !== data) {
+    const body = JSON.stringify(data);
+    contentJSON = { stamp, data, body, gz: zlib.gzipSync(body), etag: 'W/"' + crypto.createHash('sha1').update(body).digest('base64url') + '"' };
+  }
+  res.setHeader('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
+  res.setHeader('ETag', contentJSON.etag);
+  if (req.headers['if-none-match'] === contentJSON.etag) return res.status(304).end();
+  res.type('application/json').setHeader('Vary', 'Accept-Encoding');
+  if (/\bgzip\b/.test(req.headers['accept-encoding'] || '')) { res.setHeader('Content-Encoding', 'gzip'); return res.end(contentJSON.gz); } // compressé une seule fois
+  res.send(contentJSON.body);
+}));
 
 app.post('/api/login', (req, res) => {
   const username = String(req.body.username || '').trim(), password = String(req.body.password || '');
@@ -203,12 +239,13 @@ app.delete('/api/content/:type/:id', requireAdmin, wrap(async (req, res) => {
 const clean = (v, max = 200) => String(v || '').replace(/[\u0000-\u001F\u007F]/g, ' ').trim().slice(0, max);
 const cleanLong = (v, max = 1500) => String(v || '').replace(/\r/g, '').trim().slice(0, max);
 
-// anti-spam simple : 5 envois / 15 min par IP
+// anti-spam simple : 10 envois / 15 min par IP (une IP mobile peut être partagée par plusieurs personnes)
 const hits = new Map();
+setInterval(() => { const now = Date.now(); for (const [ip, l] of hits) if (!l.some(t => now - t < 15 * 60 * 1000)) hits.delete(ip); }, 5 * 60 * 1000).unref();
 function rateLimit(req, res, next) {
   const ip = req.ip, now = Date.now();
   const list = (hits.get(ip) || []).filter(t => now - t < 15 * 60 * 1000);
-  if (list.length >= 5) return res.status(429).json({ error: 'Trop de demandes. Réessayez dans quelques minutes.' });
+  if (list.length >= 10) return res.status(429).json({ error: 'Trop de demandes. Réessayez dans quelques minutes.' });
   list.push(now); hits.set(ip, list); next();
 }
 
@@ -279,10 +316,18 @@ bot.mount(app, store);
 
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ error: err.message || 'Erreur serveur.' });
+  if (res.headersSent) return next(err);
+  const code = err.code === 'LIMIT_FILE_SIZE' ? 413 : (err.status || 500);
+  res.status(code).json({ error: code === 413 ? 'Fichier trop volumineux.' : (err.message || 'Erreur serveur.') });
 });
 
-app.listen(PORT, () => {
+/* Le serveur ne doit jamais tomber : une erreur imprévue est journalisée, pas fatale */
+process.on('unhandledRejection', e => console.error('Promesse rejetée non gérée :', e));
+process.on('uncaughtException', e => console.error('Exception non gérée :', e));
+
+const server = app.listen(PORT, () => {
+  store.getContent().catch(() => {}); // préchauffe le cache dès le démarrage
+  store.getPages().catch(() => {});
   bot.setup(store);
   console.log('==========================================');
   console.log('Dahira Miftahoul Khayri');
@@ -290,3 +335,8 @@ app.listen(PORT, () => {
   console.log(`Stockage : ${store.useSupabase ? 'Supabase' : 'fichiers locaux'}`);
   console.log('==========================================');
 });
+
+// Connexions : garder-vivant plus long que le proxy de Render (évite des erreurs 502 aléatoires sous charge)
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
+server.requestTimeout = 120000; // un client très lent ne bloque pas le serveur indéfiniment
